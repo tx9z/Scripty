@@ -1,0 +1,114 @@
+-- Blox Fruits - Safe Silent Aim (No Hitbox Boxes, No Fling, Clean Hits)
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+
+-- حجم دائرة الاستهداف على الشاشة (بدون مربعات)
+local FOV_Radius = 180
+
+-- إنشاء واجهة التحكم
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "SafeAimGui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+-- رسم دائرة الاستهداف الخضراء فقط (بدون أي مربعات أو أشكال هندسية غريبة)
+local fovCircle = Instance.new("Frame")
+fovCircle.Size = UDim2.new(0, FOV_Radius * 2, 0, FOV_Radius * 2)
+fovCircle.Position = UDim2.new(0.5, -FOV_Radius, 0.5, -FOV_Radius)
+fovCircle.BackgroundTransparency = 1
+fovCircle.Visible = false
+fovCircle.Parent = screenGui
+
+local uiCorner = Instance.new("UICorner")
+uiCorner.CornerRadius = UDim.new(1, 0)
+uiCorner.Parent = fovCircle
+
+local uiStroke = Instance.new("UIStroke")
+uiStroke.Thickness = 2
+uiStroke.Color = Color3.fromRGB(0, 255, 100)
+uiStroke.Parent = fovCircle
+
+-- زر التشغيل والإيقاف (AIM ON / OFF)
+local toggleBtn = Instance.new("TextButton")
+toggleBtn.Size = UDim2.new(0, 80, 0, 35)
+toggleBtn.Position = UDim2.new(0.4, 0, 0.05, 0)
+toggleBtn.Text = "AIM: OFF"
+toggleBtn.TextSize = 12
+toggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleBtn.Parent = screenGui
+
+local btnCorner = Instance.new("UICorner")
+btnCorner.CornerRadius = UDim.new(0, 8)
+btnCorner.Parent = toggleBtn
+
+-- تحريك الزر بحرية على الشاشة
+local dragging, dragStart, startPos
+toggleBtn.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		dragging = true
+		dragStart = input.Position
+		startPos = toggleBtn.Position
+	end
+end)
+UserInputService.InputChanged:Connect(function(input)
+	if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+		local delta = input.Position - dragStart
+		toggleBtn.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+	end
+end)
+UserInputService.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		dragging = false
+	end
+end)
+
+local active = false
+toggleBtn.MouseButton1Click:Connect(function()
+	active = not active
+	if active then
+		toggleBtn.Text = "AIM: ON"
+		toggleBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
+		fovCircle.Visible = true
+	else
+		toggleBtn.Text = "AIM: OFF"
+		toggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+		fovCircle.Visible = false
+	end
+end)
+
+-- أيمبوت آمن ونظيف يوجه الضربات برمجياً بدون لمس فيزياء اللاعبين أو طيرانك
+RunService.RenderStepped:Connect(function()
+	if active then
+		pcall(function()
+			local closestPlayer = nil
+			local shortestDist = math.huge
+			local mousePos = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+			
+			for _, player in ipairs(Players:GetPlayers()) do
+				if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
+					local hrp = player.Character.HumanoidRootPart
+					local screenPoint, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+					
+					if onScreen then
+						local screenPos2D = Vector2.new(screenPoint.X, screenPoint.Y)
+						local dist = (mousePos - screenPos2D).Magnitude
+						
+						if dist < FOV_Radius and dist < shortestDist then
+							shortestDist = dist
+							closestPlayer = hrp
+						end
+					end
+				end
+			end
+			
+			-- توجيه الكاميرا والضربات بسلاسة تامة نحو الهدف دون أي مربعات أو تأثيرات دفع
+			if closestPlayer then
+				Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, closestPlayer.Position), 0.2)
+			end
+		end)
+	end
+end)
