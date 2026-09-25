@@ -1,0 +1,159 @@
+-- Blox Fruits - Target Name Lock Aim
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+
+local FOV_Radius = 180
+local targetNameQuery = ""
+
+-- إنشاء واجهة التحكم
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "TargetAimGui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+-- رسم دائرة الاستهداف الخضراء
+local fovCircle = Instance.new("Frame")
+fovCircle.Size = UDim2.new(0, FOV_Radius * 2, 0, FOV_Radius * 2)
+fovCircle.Position = UDim2.new(0.5, -FOV_Radius, 0.5, -FOV_Radius)
+fovCircle.BackgroundTransparency = 1
+fovCircle.Visible = false
+fovCircle.Parent = screenGui
+
+local uiCorner = Instance.new("UICorner")
+uiCorner.CornerRadius = UDim.new(1, 0)
+uiCorner.Parent = fovCircle
+
+local uiStroke = Instance.new("UIStroke")
+uiStroke.Thickness = 2
+uiStroke.Color = Color3.fromRGB(0, 255, 100)
+uiStroke.Parent = fovCircle
+
+-- زر التشغيل والإيقاف (AIM ON / OFF)
+local toggleBtn = Instance.new("TextButton")
+toggleBtn.Size = UDim2.new(0, 90, 0, 35)
+toggleBtn.Position = UDim2.new(0.4, 0, 0.05, 0)
+toggleBtn.Text = "AIM: OFF"
+toggleBtn.TextSize = 12
+toggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleBtn.Parent = screenGui
+
+local btnCorner = Instance.new("UICorner")
+btnCorner.CornerRadius = UDim.new(0, 8)
+btnCorner.Parent = toggleBtn
+
+-- خانة الكتابة (Target Input) تحت زر الأيم مباشرة
+local targetInput = Instance.new("TextBox")
+targetInput.Size = UDim2.new(0, 90, 0, 30)
+targetInput.Position = UDim2.new(0.4, 0, 0.11, 0)
+targetInput.PlaceholderText = "Target..."
+targetInput.Text = ""
+targetInput.TextSize = 12
+targetInput.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+targetInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+targetInput.Parent = screenGui
+
+local inputCorner = Instance.new("UICorner")
+inputCorner.CornerRadius = UDim.new(0, 8)
+inputCorner.Parent = targetInput
+
+-- حفظ النص المدخل
+targetInput.FocusLost:Connect(function()
+	targetNameQuery = string.lower(targetInput.Text)
+end)
+
+-- تحريك الأزرار بحرية على الشاشة
+local function makeDraggable(obj)
+	local dragging, dragStart, startPos
+	obj.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = true
+			dragStart = input.Position
+			startPos = obj.Position
+		end
+	end)
+	UserInputService.InputChanged:Connect(function(input)
+		if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+			local delta = input.Position - dragStart
+			obj.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+		end
+	end)
+	UserInputService.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+			dragging = false
+		end
+	end)
+end
+
+makeDraggable(toggleBtn)
+makeDraggable(targetInput)
+
+local active = false
+toggleBtn.MouseButton1Click:Connect(function()
+	active = not active
+	if active then
+		toggleBtn.Text = "AIM: ON"
+		toggleBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
+		fovCircle.Visible = true
+	else
+		toggleBtn.Text = "AIM: OFF"
+		toggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+		fovCircle.Visible = false
+	end
+end)
+
+-- نظام الأيمبوت الذكي (بالاسم أو بالأقرب داخل الدائرة)
+RunService.RenderStepped:Connect(function()
+	if active then
+		pcall(function()
+			local targetPlayer = nil
+			local currentQuery = string.lower(targetInput.Text)
+			
+			-- إذا كتب اللاعب شيئاً في خانة البحث، يبحث عنه أولاً
+			if currentQuery ~= "" then
+				for _, player in ipairs(Players:GetPlayers()) do
+					if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
+						local pName = string.lower(player.Name)
+						local pDisplayName = string.lower(player.DisplayName)
+						-- التحقق إذا كان الاسم يبدأ بالحروف المدخلة
+						if string.sub(pName, 1, #currentQuery) == currentQuery or string.sub(pDisplayName, 1, #currentQuery) == currentQuery then
+							targetPlayer = player.Character.HumanoidRootPart
+							break
+						end
+					end
+				end
+			end
+			
+			-- إذا لم يتم كتابة اسم، يتم استخدام أقرب لاعب داخل دائرة الـ FOV تلقائياً
+			if not targetPlayer then
+				local shortestDist = math.huge
+				local mousePos = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+				
+				for _, player in ipairs(Players:GetPlayers()) do
+					if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
+						local hrp = player.Character.HumanoidRootPart
+						local screenPoint, onScreen = Camera:WorldToViewportPoint(hrp.Position)
+						
+						if onScreen then
+							local screenPos2D = Vector2.new(screenPoint.X, screenPoint.Y)
+							local dist = (mousePos - screenPos2D).Magnitude
+							
+							if dist < FOV_Radius and dist < shortestDist then
+								shortestDist = dist
+								targetPlayer = hrp
+							end
+						end
+					end
+				end
+			end
+			
+			-- تثبيت الأيم بدقة مباشرة على جسم اللاعب المستهدف
+			if targetPlayer then
+				Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, targetPlayer.Position), 0.4)
+			end
+		end)
+	end
+end)
