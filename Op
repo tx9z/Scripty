@@ -1,0 +1,84 @@
+-- Blox Fruits - Behind Target Attack Redirector with ON/OFF Button
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+
+-- إنشاء واجهة التحكم والزر
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "RedirectGui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local toggleBtn = Instance.new("TextButton")
+toggleBtn.Size = UDim2.new(0, 190, 0, 40)
+toggleBtn.Position = UDim2.new(0.05, 0, 0.4, 0)
+toggleBtn.Text = "Back Hit: OFF"
+toggleBtn.TextSize = 14
+toggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleBtn.Parent = screenGui
+
+-- جعل الزر قابل للتحريك في الشاشة
+local dragging, dragStart, startPos
+toggleBtn.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		dragging = true
+		dragStart = input.Position
+		startPos = toggleBtn.Position
+	end
+end)
+UserInputService.InputChanged:Connect(function(input)
+	if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+		local delta = input.Position - dragStart
+		toggleBtn.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+	end
+end)
+UserInputService.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		dragging = false
+	end
+end)
+
+local active = false
+toggleBtn.MouseButton1Click:Connect(function()
+	active = not active
+	if active then
+		toggleBtn.Text = "Back Hit: ON"
+		toggleBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
+	else
+		toggleBtn.Text = "Back Hit: OFF"
+		toggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+	end
+end)
+
+-- حلقة التوجيه التلقائي تعمل فقط إذا كان الزر ON
+RunService.RenderStepped:Connect(function()
+	if active then
+		pcall(function()
+			local char = LocalPlayer.Character
+			if char and char:FindFirstChild("HumanoidRootPart") then
+				local hrp = char.HumanoidRootPart
+				
+				local closestTarget = nil
+				local shortestDist = 25 -- نطاق البحث عن العدو المحيط
+				
+				for _, player in ipairs(Players:GetPlayers()) do
+					if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+						local targetHrp = player.Character.HumanoidRootPart
+						local dist = (hrp.Position - targetHrp.Position).Magnitude
+						if dist < shortestDist then
+							shortestDist = dist
+							closestTarget = targetHrp
+						end
+					end
+				end
+				
+				-- توجيه الوجهة نحو العدو خلفك أو جنبك فور تفعيل الهجوم
+				if closestTarget then
+					hrp.CFrame = CFrame.new(hrp.Position, Vector3.new(closestTarget.Position.X, hrp.Position.Y, closestTarget.Position.Z))
+				end
+			end
+		end)
+	end
+end)
