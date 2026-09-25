@@ -1,0 +1,85 @@
+-- Blox Fruits - Ultra Mega Hitbox Expander (Massive Range)
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
+
+-- إنشاء واجهة التحكم والزر
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "UltraHitboxGui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local toggleBtn = Instance.new("TextButton")
+toggleBtn.Size = UDim2.new(0, 190, 0, 40)
+toggleBtn.Position = UDim2.new(0.05, 0, 0.4, 0)
+toggleBtn.Text = "Massive Hitbox: OFF"
+toggleBtn.TextSize = 14
+toggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+toggleBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+toggleBtn.Parent = screenGui
+
+-- زر قابل للتحريك للشاشة
+local dragging, dragStart, startPos
+toggleBtn.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		dragging = true
+		dragStart = input.Position
+		startPos = toggleBtn.Position
+	end
+end)
+UserInputService.InputChanged:Connect(function(input)
+	if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+		local delta = input.Position - dragStart
+		toggleBtn.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+	end
+end)
+UserInputService.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+		dragging = false
+	end
+end)
+
+local active = false
+toggleBtn.MouseButton1Click:Connect(function()
+	active = not active
+	if active then
+		toggleBtn.Text = "Massive Hitbox: ON"
+		toggleBtn.BackgroundColor3 = Color3.fromRGB(50, 180, 50)
+	else
+		toggleBtn.Text = "Massive Hitbox: OFF"
+		toggleBtn.BackgroundColor3 = Color3.fromRGB(180, 50, 50)
+	end
+end)
+
+-- تكبير حجم الـ Hitbox لمساحة ضخمة جداً
+RunService.RenderStepped:Connect(function()
+	if active then
+		pcall(function()
+			for _, player in ipairs(Players:GetPlayers()) do
+				if player ~= LocalPlayer and player.Character then
+					local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+					if hrp then
+						-- حجم ضخم جداً (50 في 50 في 50) يغطي محيط واسع حول العدو
+						hrp.Size = Vector3.new(50, 50, 50)
+						hrp.Transparency = 0.85
+						hrp.CanCollide = false
+					end
+				end
+			end
+		end)
+	else
+		pcall(function()
+			for _, player in ipairs(Players:GetPlayers()) do
+				if player ~= LocalPlayer and player.Character then
+					local hrp = player.Character:FindFirstChild("HumanoidRootPart")
+					if hrp then
+						-- إرجاع الحجم الطبيعي عند الإيقاف
+						hrp.Size = Vector3.new(2, 2, 1)
+						hrp.Transparency = 0
+					end
+				end
+			end
+		end)
+	end
+end)
