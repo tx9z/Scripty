@@ -1,0 +1,65 @@
+-- Blox Fruits - Mobile Simple Lock-On Script (Keyless)
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+-- إنشاء واجهة الزر على الشاشة
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "LockOnGui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+
+local btn = Instance.new("TextButton")
+btn.Size = UDim2.new(0, 140, 0, 45)
+btn.Position = UDim2.new(0.05, 0, 0.4, 0)
+btn.Text = "Aim Lock: OFF"
+btn.TextSize = 14
+btn.BackgroundColor3 = Color3.fromRGB(150, 40, 40)
+btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+btn.Parent = screenGui
+
+local corner = Instance.new("UICorner")
+corner.CornerRadius = UDim.new(0, 10)
+corner.Parent = btn
+
+local locked = false
+btn.MouseButton1Click:Connect(function()
+    locked = not locked
+    if locked then
+        btn.Text = "Aim Lock: ON"
+        btn.BackgroundColor3 = Color3.fromRGB(40, 150, 40)
+    else
+        btn.Text = "Aim Lock: OFF"
+        btn.BackgroundColor3 = Color3.fromRGB(150, 40, 40)
+    end
+end)
+
+-- وظيفة تتبع اللاعب وتوجيه الكاميرا نحوه مباشرة عند التفعيل
+RunService.RenderStepped:Connect(function()
+    if locked then
+        pcall(function()
+            local target = nil
+            local minDist = math.huge
+            local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            
+            if myRoot then
+                for _, p in ipairs(Players:GetPlayers()) do
+                    if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") and p.Character:FindFirstChild("Humanoid") and p.Character.Humanoid.Health > 0 then
+                        local hrp = p.Character.HumanoidRootPart
+                        local dist = (myRoot.Position - hrp.Position).Magnitude
+                        if dist < minDist then
+                            minDist = dist
+                            target = hrp
+                        end
+                    end
+                end
+                
+                -- إبقاء الكاميرا موجهة نحو الهدف المختار
+                if target then
+                    Camera.CFrame = CFrame.new(Camera.CFrame.Position, target.Position + Vector3.new(0, 2, 0))
+                end
+            end
+        end)
+    end
+end)
